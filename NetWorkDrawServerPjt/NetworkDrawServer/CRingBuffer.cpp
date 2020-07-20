@@ -210,13 +210,11 @@ int CRingBuffer::Peek(char* chpDest, int iSize)
 
 		memcpy(&chpDest[directSize], &this->mRingBuffer[(cFront + 1) % queueLen], addSize);
 
-		//cFront = (cFront + addSize) % queueLen;
 	}
 	else
 	{
 		memcpy(chpDest, &this->mRingBuffer[cFront + 1], iSize);
 
-		//cFront = cFront + iSize;
 	}
 
 	return iSize;

@@ -52,7 +52,6 @@ public:
 
 		const Iterator& operator++(int)
 		{
-
 			const Iterator iterator(this->node->next);
 			return iterator;
 		}
@@ -109,6 +108,8 @@ public:
 
 		head->next = tail;
 		tail->prev = head;
+
+		tail->deleteCheck = true;
 
 		head->prev = nullptr;
 		tail->next = nullptr;

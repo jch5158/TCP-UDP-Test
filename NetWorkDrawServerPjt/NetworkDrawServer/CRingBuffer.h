@@ -3,7 +3,7 @@ class CRingBuffer
 {
 public:
 
-	CRingBuffer(int queueLen = 2000);
+	CRingBuffer(int queueLen = 10000);
 
 	~CRingBuffer(void);
 

@@ -161,7 +161,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-            DeleteSession();
+        
         }
     }
 
@@ -314,18 +314,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (WSAGETSELECTEVENT(lParam))
         {
         case FD_READ:
-        {
-            
+   
             ReadEvent();
-        }
+        
             break;
         case FD_WRITE:
-            
+
             BroadCasttingEvent();
 
             break;
         case FD_CLOSE:
-                   
+                  
+            Disconnect(wParam);
+            DeleteSession();
+
             break;
         }
 
@@ -389,7 +391,7 @@ void ReadEvent()
 {
     int retval;
     
-    char buffer[1000];
+    char buffer[9900];
 
     stHeader header;
     stDrawPacket drawPacket;
@@ -398,7 +400,7 @@ void ReadEvent()
 
     for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE; ++iter)
     {
-        retval = recv(iter->clientSock, buffer, 1000, 0);
+        retval = recv(iter->clientSock, buffer, sizeof(buffer), 0);
         if (retval == SOCKET_ERROR)
         {
             if (WSAGetLastError() != WSAEWOULDBLOCK)
@@ -465,7 +467,7 @@ void Disconnect(SOCKET clientSock)
         if (iter->clientSock == clientSock)
         {
             (*iter)->deleteCheck = true;
-         
+
             return;
         }
     }
@@ -475,7 +477,7 @@ void BroadCasttingEvent()
 {
     int retval;
 
-    char buffer[1000];
+    char buffer[9900];
 
     CList<Session*>::Iterator iterE = sessionList.end();
 
@@ -488,34 +490,38 @@ void BroadCasttingEvent()
                 break;
             }
 
-
-            retval = iter->sendRqueue.Peek(buffer, 1000);
+            retval = iter->sendRqueue.Peek(buffer, sizeof(buffer));
             if (retval == 0)
             {
                 Disconnect(iter->clientSock);
-                return;
+                break;
             }
 
+            iter->sendRqueue.MoveFront(retval);
+
             for (CList<Session*>::Iterator iterC = sessionList.begin(); iterC != iterE; ++iterC) {
-                if (!(*iter)->deleteCheck) {
-                    retval = send(iterC->clientSock, buffer, retval, 0);
-                    if (retval == SOCKET_ERROR)
+
+                if ((*iter)->deleteCheck == true)
+                {
+                    continue;
+                }
+
+                retval = send(iterC->clientSock, buffer, retval, 0);
+                if (retval == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSAEWOULDBLOCK)
                     {
-                        if (WSAGetLastError() != WSAEWOULDBLOCK)
-                        {
-                            printf_s("send error\n");
-                            Disconnect(iter->clientSock);
-                            continue;
-                        }
+                        printf_s("send error\n");
+                        Disconnect(iter->clientSock);
+                        continue;
                     }
                 }
             }
 
-            iter->sendRqueue.MoveFront(retval);
         } 
     }
 
-    DeleteSession();
+   DeleteSession();
 }
 
 void WriteBuffer(Session* session, stHeader header, stDrawPacket drawPacket, int iSize)
@@ -548,16 +554,21 @@ void DeleteSession()
 {
     CList<Session*>::Iterator iterE = sessionList.end();
 
-    for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE; ++iter)
+    for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE;)
     {
         if ((*iter)->deleteCheck)
         {   
-            printf_s("delete session\n");
+            sockSu--;
+            printf_s("sock su : %d\n",sockSu);
             closesocket(iter->clientSock);
             delete (*iter)->data;
-            sessionList.erase(iter);
-            return;
+            iter = sessionList.erase(iter);
         }
+        else
+        {
+            ++iter;
+        }
+
     }
 
 }
