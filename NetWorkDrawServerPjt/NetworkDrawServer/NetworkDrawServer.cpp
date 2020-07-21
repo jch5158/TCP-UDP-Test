@@ -57,16 +57,20 @@ SOCKET listenSock;
 
 CList<Session*> sessionList;
 
+// recv하는 함수입니다.
+void ReadEvent();
 
+// 버퍼에 send할 데이터를 인큐한다.
+void WriteBuffer(Session* session, stHeader header, stDrawPacket drawPacket, int iSize);
+
+// 그려야될 선을 모든 클라이언트에게 뿌린다.
 void BroadCasttingEvent();
 
-void WriteBuffer(Session *session,stHeader header, stDrawPacket drawPacket, int iSize);
-
+// 삭제할 소켓을 등록한다.
 void Disconnect(SOCKET clientSock);
 
+// 등록한 소켓을 해제하고 iterator에서 삭제한다.
 void DeleteSession();
-
-void ReadEvent();
 
 DWORD sockSu;
 
@@ -259,13 +263,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             int addrLen = sizeof(clientAddr);
 
-            clientSock = accept(listenSock, (SOCKADDR*)&clientAddr, &addrLen);
+            clientSock = accept(wParam, (SOCKADDR*)&clientAddr, &addrLen);
             if (clientSock == INVALID_SOCKET)
             {
                 if (WSAGetLastError() != WSAEWOULDBLOCK)
                 {
                     printf_s("accept error %d\n", WSAGetLastError());
-                    closesocket(listenSock);
+                    closesocket(wParam);
                     return -1;
                 }
                 return -1;
@@ -458,19 +462,28 @@ void ReadEvent()
 
 }
 
-void Disconnect(SOCKET clientSock)
+void WriteBuffer(Session* session, stHeader header, stDrawPacket drawPacket, int iSize)
 {
-    CList<Session*>::Iterator iterE = sessionList.end();
+    int retval;
 
-    for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE; ++iter)
+    retval = session->sendRqueue.Enqueue((char*)&header, 2);
+    if (retval != 2)
     {
-        if (iter->clientSock == clientSock)
-        {
-            (*iter)->deleteCheck = true;
-
-            return;
-        }
+        printf_s("%d\n", session->sendRqueue.GetUseSize());
+        printf_s("send enqueue error 1\n");
+        Disconnect(session->clientSock);
+        return;
     }
+
+    retval = session->sendRqueue.Enqueue((char*)&drawPacket, iSize);
+    if (retval != iSize)
+    {
+        printf_s("send enqueue error 2\n");
+        Disconnect(session->clientSock);
+        return;
+    }
+ 
+    return;
 }
 
 void BroadCasttingEvent()
@@ -482,7 +495,7 @@ void BroadCasttingEvent()
     CList<Session*>::Iterator iterE = sessionList.end();
 
     for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE; ++iter)
-    { 
+    {
         while (1)
         {
             if (iter->sendRqueue.GetUseSize() == 0)
@@ -518,37 +531,26 @@ void BroadCasttingEvent()
                 }
             }
 
-        } 
+        }
     }
 
-   DeleteSession();
+    DeleteSession();
 }
 
-void WriteBuffer(Session* session, stHeader header, stDrawPacket drawPacket, int iSize)
+void Disconnect(SOCKET clientSock)
 {
-    int retval;
+    CList<Session*>::Iterator iterE = sessionList.end();
 
-    retval = session->sendRqueue.Enqueue((char*)&header, 2);
-    if (retval != 2)
+    for (CList<Session*>::Iterator iter = sessionList.begin(); iter != iterE; ++iter)
     {
-        printf_s("%d\n", session->sendRqueue.GetUseSize());
-        printf_s("send enqueue error 1\n");
-        Disconnect(session->clientSock);
-        return;
-    }
+        if (iter->clientSock == clientSock)
+        {
+            (*iter)->deleteCheck = true;
 
-    retval = session->sendRqueue.Enqueue((char*)&drawPacket, iSize);
-    if (retval != iSize)
-    {
-        printf_s("send enqueue error 2\n");
-        Disconnect(session->clientSock);
-        return;
+            return;
+        }
     }
- 
-    return;
 }
-
-
 
 void DeleteSession()
 {
@@ -568,7 +570,5 @@ void DeleteSession()
         {
             ++iter;
         }
-
     }
-
 }

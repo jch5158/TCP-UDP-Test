@@ -109,8 +109,6 @@ public:
 		head->next = tail;
 		tail->prev = head;
 
-		tail->deleteCheck = true;
-
 		head->prev = nullptr;
 		tail->next = nullptr;
 	}
